@@ -1,5 +1,5 @@
 dataset_type = 'DOTADataset'
-data_root = 'mmdata/GeoMap/'
+data_root = '/home/DATA/RAMDISK/OBBDetection/mmdata/GeoMap/'
 
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53],
@@ -53,8 +53,8 @@ test_pipeline = [
 ]
 
 data = dict(
-    samples_per_gpu=4,
-    workers_per_gpu=4,
+    samples_per_gpu=2,
+    workers_per_gpu=2,
     train=dict(
         type=dataset_type, 
         task='Task1',
@@ -77,5 +77,14 @@ data = dict(
         classes=classes,
         pipeline=test_pipeline)
 )
+
+data_loader = dict(
+    persistent_workers=False,  
+    prefetch_factor=2,
+    pin_memory=True
+)
+
+opencv_num_threads = 0
+omp_num_threads = 1
 
 evaluation = dict(metric='mAP')
