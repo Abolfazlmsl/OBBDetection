@@ -17,7 +17,7 @@ train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadOBBAnnotations', with_bbox=True, with_label=True),
     dict(type='Mask2OBB'),
-    dict(type='Resize', img_scale=(1024, 1024), keep_ratio=True),
+    dict(type='Resize', img_scale=(416, 416), keep_ratio=True),
     dict(type='OBBRandomFlip', h_flip_ratio=0.5, v_flip_ratio=0.5),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size_divisor=32),
@@ -34,7 +34,7 @@ test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(
         type='MultiScaleFlipRotateAug',
-        img_scale=[(1024, 1024)],
+        img_scale=[(416, 416)],
         h_flip=False,
         v_flip=False,
         rotate=False,
