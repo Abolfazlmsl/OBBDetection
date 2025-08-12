@@ -8,7 +8,7 @@ Created on Sun Aug 10 13:23:33 2025
 
 import subprocess
 
-split_name = "train" # train or val
+split_name = "test" # train or val or test
 sizes = 416         
 gaps = 150 
 save_dir = f"/home/DATA/RAMDISK/OBBDetection/mmdata/GeoMap/{split_name}_split"

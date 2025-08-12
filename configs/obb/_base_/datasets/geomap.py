@@ -15,19 +15,20 @@ classes = (
 
 train_pipeline = [
     dict(type='LoadImageFromFile'),
-    dict(type='LoadOBBAnnotations', with_bbox=True, with_label=True),
-    dict(type='Mask2OBB'),
+    dict(type='LoadOBBAnnotations', with_bbox=True,
+         with_label=True, obb_as_mask=True),
+    dict(type='LoadDOTASpecialInfo'),
     dict(type='Resize', img_scale=(416, 416), keep_ratio=True),
     dict(type='OBBRandomFlip', h_flip_ratio=0.5, v_flip_ratio=0.5),
     dict(type='Normalize', **img_norm_cfg),
+    dict(type='RandomOBBRotate', rotate_after_flip=True,
+         angles=(0, 0), vert_rate=0.5, vert_cls=['roundabout', 'storage-tank']),
     dict(type='Pad', size_divisor=32),
+    dict(type='DOTASpecialIgnore', ignore_size=2),
+    dict(type='FliterEmpty'),
+    dict(type='Mask2OBB', obb_type='obb'),
     dict(type='OBBDefaultFormatBundle'),
-    dict(
-        type='OBBCollect',
-        keys=['img', 'gt_obboxes', 'gt_bboxes', 'gt_labels'],
-        meta_keys=['img_shape', 'scale_factor', 'pad_shape', 'filename']
-    )
-
+    dict(type='OBBCollect', keys=['img', 'gt_bboxes', 'gt_obboxes', 'gt_labels'])
 ]
 
 test_pipeline = [
@@ -40,15 +41,12 @@ test_pipeline = [
         rotate=False,
         transforms=[
             dict(type='Resize', keep_ratio=True),
+            dict(type='OBBRandomFlip'),
             dict(type='Normalize', **img_norm_cfg),
+            dict(type='RandomOBBRotate', rotate_after_flip=True),
             dict(type='Pad', size_divisor=32),
             dict(type='ImageToTensor', keys=['img']),
-            dict(
-                type='OBBCollect',
-                keys=['img'],
-                meta_keys=['img_shape', 'scale_factor', 'pad_shape', 'filename']
-                )
-
+            dict(type='OBBCollect', keys=['img']),
         ])
 ]
 
@@ -72,8 +70,8 @@ data = dict(
     test=dict(
         type=dataset_type,
         task='Task1',
-        ann_file=data_root + 'val_split/annfiles/',
-        img_prefix=data_root + 'val_split/images/',
+        ann_file=data_root + 'test_split/annfiles/',
+        img_prefix=data_root + 'test_split/images/',
         classes=classes,
         pipeline=test_pipeline)
 )

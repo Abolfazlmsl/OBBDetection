@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Created on Sun Aug 10 11:03:00 2025
@@ -10,18 +11,25 @@ import subprocess
 import sys
 from datetime import datetime
 
+# ===== GPU Mode Toggle =====
+USE_DUAL_GPU = False  # Set to True for dual-GPU training, False for single-GPU
+
 # ===== Resume Settings =====
-RESUME_TRAINING = True  # If False, always start fresh
-RESUME_FOLDER = "faster_rcnn_orpn_r50_fpn_1x_dota10_20250812_141000"  # Folder name under work_dirs
+RESUME_TRAINING = False  # If False, always start from scratch
+RESUME_FOLDER = "faster_rcnn_orpn_r50_fpn_1x_dota10_20250811_111928"  # Folder name under work_dirs
 
 # ===== Stability & Safety =====
-os.environ.setdefault("CUDA_VISIBLE_DEVICES", "0,1")
-os.environ["NCCL_ASYNC_ERROR_HANDLING"] = "1"
-os.environ["NCCL_BLOCKING_WAIT"] = "1"
+if USE_DUAL_GPU:
+    os.environ.setdefault("CUDA_VISIBLE_DEVICES", "0,1")
+    os.environ["NCCL_ASYNC_ERROR_HANDLING"] = "1"
+    os.environ["NCCL_BLOCKING_WAIT"] = "1"
+    os.environ.setdefault("TORCH_NCCL_BLOCKING_WAIT", "1")
+else:
+    os.environ.setdefault("CUDA_VISIBLE_DEVICES", "0")
+
 os.environ["PYTHONFAULTHANDLER"] = "1"
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["CUDA_DEVICE_MAX_CONNECTIONS"] = "1"
-os.environ.setdefault("TORCH_NCCL_BLOCKING_WAIT", "1")
 
 # ===== Config =====
 CFG = sys.argv[1] if len(sys.argv) > 1 else \
@@ -56,15 +64,25 @@ else:
     os.makedirs(WORKDIR, exist_ok=True)
 
 # ===== Command =====
-cmd = [
-    "torchrun",
-    "--standalone",
-    "--nproc_per_node=2",
-    "tools/train.py", CFG,
-    "--launcher", "pytorch",
-    "--work-dir", WORKDIR,
-    "--seed", "42", "--deterministic"
-]
+if USE_DUAL_GPU:
+    cmd = [
+        "torchrun",
+        "--standalone",
+        "--nproc_per_node=2",
+        "tools/train.py", CFG,
+        "--launcher", "pytorch",
+        "--work-dir", WORKDIR,
+        "--seed", "42", "--deterministic"
+    ]
+else:
+    cmd = [
+        sys.executable, "tools/train.py", CFG,
+        "--launcher", "none",
+        "--gpu-ids", "0",
+        "--work-dir", WORKDIR,
+        "--seed", "42", "--deterministic"
+    ]
+
 if resume_from:
     cmd.extend(["--resume-from", resume_from])
 
@@ -77,9 +95,7 @@ except subprocess.CalledProcessError as e:
     sys.exit(1)
 except RuntimeError as e:
     if "CUDA out of memory" in str(e) or "CUDA error" in str(e):
-        print("[FATAL] CUDA Out Of Memory detected! Stopping all processes...")
+        print("[FATAL] CUDA Out Of Memory detected! Stopping process...")
         sys.exit(1)
     else:
         raise
-
-

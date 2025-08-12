@@ -124,3 +124,5 @@ work_dirs/
 *.swp
 
 mmdata/
+Output/
+
