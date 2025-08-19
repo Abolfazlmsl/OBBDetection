@@ -1,5 +1,5 @@
 _base_ = [
-    '../_base_/datasets/dota.py',
+    '../_base_/datasets/geomap.py',
     '../_base_/schedules/schedule_1x.py',
     '../../_base_/default_runtime.py'
 ]
@@ -68,6 +68,6 @@ train_cfg = dict(
 test_cfg = dict(
     nms_pre=2000,
     min_bbox_size=0,
-    score_thr=0.05,
-    nms=dict(type='obb_nms', iou_thr=0.1),
+    score_thr=0.5,
+    nms=dict(type='obb_nms', iou_thr=0.5),
     max_per_img=2000)

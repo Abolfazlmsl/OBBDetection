@@ -32,8 +32,8 @@ os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["CUDA_DEVICE_MAX_CONNECTIONS"] = "1"
 
 # ===== Config =====
-CFG = sys.argv[1] if len(sys.argv) > 1 else \
-    "configs/obb/oriented_rcnn/faster_rcnn_orpn_r50_fpn_1x_dota10.py"
+# CFG = "configs/obb/oriented_rcnn/faster_rcnn_orpn_r50_fpn_1x_dota10.py"
+CFG = "configs/obb/retinanet_obb/retinanet_obb_r101_fpn_2x_dota10.py"
 
 # ===== Workdir =====
 WORKDIR_ROOT = "/home/DATA/RAMDISK/OBBDetection/work_dirs"

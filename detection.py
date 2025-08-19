@@ -15,14 +15,18 @@ from mmdet.apis import init_detector, inference_detector
 from concurrent.futures import ThreadPoolExecutor
 
 # ===== User Settings =====
+CALCULATE_METRICS = True
+
 TILE_MODELS = [
     # {"config": "configs/obb/oriented_rcnn/faster_rcnn_orpn_r50_fpn_tile128.py",
     #  "checkpoint": "best128.pth", "tile_size": 128, "overlap": 20},
     {"config": "configs/obb/oriented_rcnn/faster_rcnn_orpn_r50_fpn_1x_dota10.py",
-     "checkpoint": "Checkpoints/best416.pth", "tile_size": 416, "overlap": 150}
+     "checkpoint": "Checkpoints/best128.pth", "tile_size": 128, "overlap": 50}
 ]
 
+iou_thr = 0.25
 IOU_THRESHOLD = 0.2
+
 CLASS_NAMES = {
     0: "Landslide 1",
     1: "Strike",
@@ -58,22 +62,43 @@ CLASS_COLORS = {
     13: (123, 232, 23), # Spring B2 
 }
 
-CLASS_THRESHOLDS = {
-    0: 0.6,  # Landslide 1
-    1: 0.8,  # Strike
-    2: 0.8,  # Spring 1
-    3: 0.8,  # Minepit 1
-    4: 0.8,  # Hillside
-    5: 0.7,  # Feuchte
-    6: 0.7,  # Torf
-    7: 0.92,  # Bergsturz
-    8: 0.8,  # Landslide 2
-    9: 0.7,  # Spring 2
-    10: 0.7,  # Spring 3
-    11: 0.6,  # Minepit 2
-    12: 0.05,  # Spring B2
-    13: 0.05,  # Hillside B2
-}
+if CALCULATE_METRICS:
+    CLASS_THRESHOLDS = {
+        0: 0.0,  # Landslide 1
+        1: 0.0,  # Strike
+        2: 0.0,  # Spring 1
+        3: 0.0,  # Minepit 1
+        4: 0.0,  # Hillside
+        5: 0.0,  # Feuchte
+        6: 0.0,  # Torf
+        7: 0.0,  # Bergsturz
+        8: 0.0,  # Landslide 2
+        9: 0.0,  # Spring 2
+        10: 0.0,  # Spring 3
+        11: 0.0,  # Minepit 2
+        12: 0.0,  # Spring B2
+        13: 0.0,  # Hillside B2
+    }
+else:
+    CLASS_THRESHOLDS = {
+        0: 0.6,  # Landslide 1
+        1: 0.8,  # Strike
+        2: 0.8,  # Spring 1
+        3: 0.8,  # Minepit 1
+        4: 0.8,  # Hillside
+        5: 0.7,  # Feuchte
+        6: 0.7,  # Torf
+        7: 0.92,  # Bergsturz
+        8: 0.8,  # Landslide 2
+        9: 0.7,  # Spring 2
+        10: 0.7,  # Spring 3
+        11: 0.6,  # Minepit 2
+        12: 0.05,  # Spring B2
+        13: 0.05,  # Hillside B2
+    }
+
+EXCLUDED_CLASSES = {} if CALCULATE_METRICS else {12, 13}
+all_dets_per_image = {}
 
 INPUT_DIR = "Input"
 OUTPUT_DIR = "Output"
@@ -91,22 +116,167 @@ def polygon_iou(box1, box2):
     union = poly1.area + poly2.area - inter
     return inter / union if union > 0 else 0.0
 
-def merge_detections(dets, iou_thr=0.5):
-    if not dets:
+
+def merge_detections(detections, iou_threshold=0.5, excluse_check=True):
+    """
+    Merge overlapping detections while considering confidence and class types.
+    detections: [(x1..y4, cls, conf), ...]
+    """
+    if not detections:
         return []
-    dets.sort(key=lambda x: x[9], reverse=True)
+
+    detections.sort(key=lambda x: x[9], reverse=True)
     merged = []
-    for det1 in dets:
-        b1, cls1 = det1[:8], det1[8]
+
+    excluded_boxes = [det[:11] for det in detections if det[8] in EXCLUDED_CLASSES]
+
+    for det1 in detections:
+        box1, cls1, conf1 = det1[:8], det1[8], det1[9]
+        if cls1 in EXCLUDED_CLASSES:
+            continue
+
         keep = True
+ 
+        if excluse_check:
+            for det_excl in excluded_boxes:
+                excl_box, excl_cls, excl_conf = det_excl[:8], det_excl[8], det_excl[9]
+                iou = polygon_iou(box1, excl_box)
+                if iou > 0.3:
+                    if conf1 > 0.85 or excl_conf < 0.5:
+                        continue
+                    else:
+                        keep = False
+                        break
+
         for det2 in merged:
-            b2, cls2 = det2[:8], det2[8]
-            if cls1 == cls2 and polygon_iou(b1, b2) >= iou_thr:
+            box2, cls2 = det2[:8], det2[8]
+            if cls1 == cls2 and polygon_iou(box1, box2) >= iou_threshold:
                 keep = False
                 break
+
         if keep:
             merged.append(det1)
+
     return merged
+
+# ===== Evaluation utils (YOLO-like) =====
+
+def _label_path_for_image(image_path):
+    base = os.path.splitext(os.path.basename(image_path))[0] + ".txt"
+    cand1 = os.path.join(os.path.dirname(image_path), base)
+    if os.path.exists(cand1):
+        return cand1
+    labels_dir = os.path.join(os.path.dirname(image_path), "Labels")
+    cand2 = os.path.join(labels_dir, base)
+    if os.path.exists(cand2):
+        return cand2
+    return None  # same logic as YOLO script
+
+def _load_gt_as_pixels(image_path):
+    lp = _label_path_for_image(image_path)
+    gts = []
+    if lp is None or not os.path.exists(lp):
+        return gts
+    img = cv2.imread(image_path)
+    if img is None:
+        return gts
+    h, w = img.shape[:2]
+    with open(lp, "r") as f:
+        for line in f:
+            parts = line.strip().split()
+            if len(parts) != 9:
+                continue
+            cls_id = int(parts[0])
+            vals = list(map(float, parts[1:]))
+            pts_pix = [(vals[i]*w, vals[i+1]*h) for i in range(0, 8, 2)]
+            gts.append({"cls": cls_id, "pts": pts_pix})
+    return gts  # :contentReference[oaicite:2]{index=2}
+
+def _match_dets_to_gts_pixel(dets, gts, iou_thr=0.5):
+    used = [False]*len(gts)
+    tp = 0
+    for det in dets:
+        box1 = det[:8]
+        cls1 = int(det[8])
+        best_iou, best_j = 0.0, -1
+        for j, g in enumerate(gts):
+            if used[j] or cls1 != g["cls"]:
+                continue
+            box2 = [coord for pt in g["pts"] for coord in pt]
+            iou = polygon_iou(box1, box2)
+            if iou > best_iou:
+                best_iou, best_j = iou, j
+        if best_iou >= iou_thr and best_j >= 0:
+            used[best_j] = True
+            tp += 1
+    fp = len(dets) - tp
+    fn = used.count(False)
+    return tp, fp, fn  # :contentReference[oaicite:3]{index=3}
+
+def _prec_rec_f1(tp, fp, fn):
+    P = tp / (tp + fp + 1e-9)
+    R = tp / (tp + fn + 1e-9)
+    F1 = 2 * P * R / (P + R + 1e-9)
+    return P, R, F1  # :contentReference[oaicite:4]{index=4}
+
+def _evaluate_dataset(all_images, conf_thr=0.25, iou_thr=0.5):
+    tot_tp = tot_fp = tot_fn = 0
+    for img_path in all_images:
+        dets_all = all_dets_per_image.get(img_path, [])
+        filtered = [d for d in dets_all if d[9] >= conf_thr]
+        gts = _load_gt_as_pixels(img_path)
+        tp, fp, fn = _match_dets_to_gts_pixel(filtered, gts, iou_thr=iou_thr)
+        tot_tp += tp; tot_fp += fp; tot_fn += fn
+    return _prec_rec_f1(tot_tp, tot_fp, tot_fn)  # :contentReference[oaicite:5]{index=5}
+
+def _find_best_conf_threshold(all_images, iou_thr=0.5):
+    best = {"thr": 0.25, "P": 0.0, "R": 0.0, "F1": -1.0}
+    for thr in np.linspace(0.05, 0.95, 19):
+        P, R, F1 = _evaluate_dataset(all_images, conf_thr=float(thr), iou_thr=iou_thr)
+        if F1 > best["F1"]:
+            best = {"thr": float(thr), "P": float(P), "R": float(R), "F1": float(F1)}
+    return best  # :contentReference[oaicite:6]{index=6}
+
+def _classwise_report(all_images, conf_thr=0.25, iou_thr=0.5):
+    rows = []
+    all_cids = set()
+    for dets in all_dets_per_image.values():
+        for d in dets:
+            all_cids.add(int(d[8]))
+    all_cids = sorted(all_cids)
+
+    for cid in all_cids:
+        tp=fp=fn=0
+        for img_path in all_images:
+            dets_all = all_dets_per_image.get(img_path, [])
+            dets_c = [d for d in dets_all if (int(d[8])==cid and d[9]>=conf_thr)]
+            gts = _load_gt_as_pixels(img_path)
+            gts_c = [g for g in gts if g["cls"]==cid]
+            tpp,fpp,fnn = _match_dets_to_gts_pixel(dets_c, gts_c, iou_thr=iou_thr)
+            tp += tpp; fp += fpp; fn += fnn
+        P,R,F1 = _prec_rec_f1(tp,fp,fn)
+        cname = CLASS_NAMES.get(cid, str(cid))
+        rows.append([cid, cname, tp, fp, fn, P, R, F1])
+
+    df = pd.DataFrame(rows, columns=["cls_id","class","TP","FP","FN","Precision","Recall","F1"])
+    out_path = os.path.join(OUTPUT_DIR, "fusion_classwise_metrics.xlsx")
+    df.to_excel(out_path, index=False)
+    print(f"[Saved] {out_path}")
+    return df  # :contentReference[oaicite:7]{index=7}
+
+def run_fusion_eval(input_dir, iou_thr=0.5):
+    all_images = [os.path.join(input_dir, f) for f in os.listdir(input_dir)
+                  if f.lower().endswith(('.png','.jpg','.jpeg','.tif','.tiff'))]
+    if not all_images:
+        print("[Eval] No images found for evaluation.")
+        return
+    print(f"Tile models: {[m['tile_size'] for m in TILE_MODELS]}")
+    best = _find_best_conf_threshold(all_images, iou_thr=iou_thr)
+    print(f"[Fusion] Best confidence threshold (by F1): {best['thr']:.2f} | P={best['P']:.3f} R={best['R']:.3f} F1={best['F1']:.3f}")
+    P, R, F1 = _evaluate_dataset(all_images, conf_thr=best['thr'], iou_thr=iou_thr)
+    print(f"[Fusion @ {best['thr']:.2f}] Precision={P:.3f} | Recall={R:.3f} | F1={F1:.3f}")
+    _classwise_report(all_images, conf_thr=best['thr'], iou_thr=iou_thr)  # :contentReference[oaicite:8]{index=8}
+
 
 def run_tiled_detection(model, image, tile_size, overlap):
     """
@@ -174,7 +344,7 @@ def process_image(image_path, models, gpu_id):
         dets = run_tiled_detection(model, image, model_info["tile_size"], model_info["overlap"])
         all_detections.extend(dets)
 
-    merged = merge_detections(all_detections, IOU_THRESHOLD)
+    merged = merge_detections(all_detections, IOU_THRESHOLD, False)
     result_img = image.copy()
     rows = []
     for x1,y1,x2,y2,x3,y3,x4,y4,cls,conf in merged:
@@ -208,6 +378,8 @@ def process_image(image_path, models, gpu_id):
     cv2.imwrite(out_img_path, result_img)
     pd.DataFrame(rows, columns=["Class","X1","Y1","X2","Y2","X3","Y3","X4","Y4","Conf"]).to_excel(excel_path, index=False)
     print(f"[GPU{gpu_id}] Saved: {out_img_path} and {excel_path}")
+    
+    all_dets_per_image[image_path] = merged
 
 # ===== Main Run =====
 if __name__ == "__main__":
@@ -230,3 +402,9 @@ if __name__ == "__main__":
         models_gpu0 = [init_detector(m["config"], m["checkpoint"], device='cuda:0') for m in TILE_MODELS]
         for img in image_files:
             process_image(img, models_gpu0, 0)
+            
+    if CALCULATE_METRICS:
+        try:
+            run_fusion_eval(INPUT_DIR, iou_thr=iou_thr)
+        except Exception as e:
+            print(f"[Eval] Skipped due to error: {e}")
