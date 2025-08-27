@@ -18,11 +18,15 @@ train_pipeline = [
     dict(type='LoadOBBAnnotations', with_bbox=True,
          with_label=True, obb_as_mask=True),
     dict(type='LoadDOTASpecialInfo'),
-    dict(type='Resize', img_scale=(416, 416), keep_ratio=True),
-    dict(type='OBBRandomFlip', h_flip_ratio=0.5, v_flip_ratio=0.5),
+    dict(type='OBBRandomFlip', h_flip_ratio=0.0, v_flip_ratio=0.0),
+    dict(
+    type='RandomOBBRotate',
+    rotate_after_flip=False,
+    angles=(0,0),  
+    vert_rate=0.0, 
+    vert_cls=[]
+    ),
     dict(type='Normalize', **img_norm_cfg),
-    dict(type='RandomOBBRotate', rotate_after_flip=True,
-         angles=(0, 0), vert_rate=0.5, vert_cls=['roundabout', 'storage-tank']),
     dict(type='Pad', size_divisor=32),
     dict(type='DOTASpecialIgnore', ignore_size=2),
     dict(type='FliterEmpty'),
@@ -31,27 +35,30 @@ train_pipeline = [
     dict(type='OBBCollect', keys=['img', 'gt_bboxes', 'gt_obboxes', 'gt_labels'])
 ]
 
+
 test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(
         type='MultiScaleFlipRotateAug',
-        img_scale=[(416, 416)],
+        img_scale=(128, 128),
         h_flip=False,
         v_flip=False,
         rotate=False,
         transforms=[
-            dict(type='Resize', keep_ratio=True),
-            dict(type='OBBRandomFlip'),
+            dict(type='Resize', keep_ratio=True), 
+            dict(type='OBBRandomFlip', h_flip_ratio=0.0, v_flip_ratio=0.0),
+            dict(type='RandomOBBRotate', rotate_after_flip=False, angles=(0,0), vert_rate=0.0, vert_cls=[]), 
             dict(type='Normalize', **img_norm_cfg),
-            dict(type='RandomOBBRotate', rotate_after_flip=True),
             dict(type='Pad', size_divisor=32),
             dict(type='ImageToTensor', keys=['img']),
             dict(type='OBBCollect', keys=['img']),
         ])
 ]
 
+
+
 data = dict(
-    samples_per_gpu=2,
+    samples_per_gpu=16,
     workers_per_gpu=2,
     train=dict(
         type=dataset_type, 

@@ -1,5 +1,5 @@
 _base_ = [
-    '../_base_/datasets/dota.py',
+    '../_base_/datasets/geomap.py',
     '../_base_/schedules/schedule_1x.py',
     '../../_base_/default_runtime.py'
 ]
@@ -51,7 +51,7 @@ model = dict(
             in_channels=256,
             fc_out_channels=1024,
             roi_feat_size=7,
-            num_classes=15,
+            num_classes=14,
             bbox_coder=dict(
                 type='HBB2OBBDeltaXYWHTCoder',
                 target_means=[0., 0., 0., 0., 0.],
@@ -115,4 +115,4 @@ test_cfg = dict(
         nms_thr=0.7,
         min_bbox_size=0),
     rcnn=dict(
-        score_thr=0.05, nms=dict(type='obb_nms', iou_thr=0.1), max_per_img=2000))
+        score_thr=0.9, nms=dict(type='obb_nms', iou_thr=0.5), max_per_img=2000))

@@ -18,11 +18,16 @@ from concurrent.futures import ThreadPoolExecutor
 CALCULATE_METRICS = True
 
 TILE_MODELS = [
-    # {"config": "configs/obb/oriented_rcnn/faster_rcnn_orpn_r50_fpn_tile128.py",
-    #  "checkpoint": "best128.pth", "tile_size": 128, "overlap": 20},
-    {"config": "configs/obb/oriented_rcnn/faster_rcnn_orpn_r50_fpn_1x_dota10.py",
-     "checkpoint": "Checkpoints/best128.pth", "tile_size": 128, "overlap": 50}
+    {"config": "configs/obb/oriented_rcnn/faster_rcnn_orpn_r101_fpn_1x_dota10.py",
+      "checkpoint": "Checkpoints/best128.pth", "tile_size": 128, "overlap": 50}
+    # {"config": "configs/obb/oriented_rcnn/faster_rcnn_orpn_r101_fpn_1x_dota10.py",
+    #  "checkpoint": "Checkpoints/best416.pth", "tile_size": 416, "overlap": 150}
+    # {"config": "configs/obb/retinanet_obb/retinanet_obb_r101_fpn_2x_dota10.py",
+    #  "checkpoint": "Checkpoints/best416-ret.pth", "tile_size": 416, "overlap": 150}
+    # {"config": "configs/obb/faster_rcnn_obb/faster_rcnn_obb_r101_fpn_1x_dota10.py",
+    #  "checkpoint": "Checkpoints/best416-cnn.pth", "tile_size": 416, "overlap": 150}
 ]
+
 
 iou_thr = 0.25
 IOU_THRESHOLD = 0.2

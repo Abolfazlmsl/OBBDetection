@@ -30,7 +30,7 @@ model = dict(
         num_outs=5),
     bbox_head=dict(
         type='OBBRetinaHead',
-        num_classes=15,
+        num_classes=14,
         in_channels=256,
         stacked_convs=4,
         feat_channels=256,
@@ -68,6 +68,6 @@ train_cfg = dict(
 test_cfg = dict(
     nms_pre=2000,
     min_bbox_size=0,
-    score_thr=0.5,
+    score_thr=0.9,
     nms=dict(type='obb_nms', iou_thr=0.5),
     max_per_img=2000)

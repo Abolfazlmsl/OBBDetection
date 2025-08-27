@@ -16,7 +16,7 @@ USE_DUAL_GPU = False  # Set to True for dual-GPU training, False for single-GPU
 
 # ===== Resume Settings =====
 RESUME_TRAINING = False  # If False, always start from scratch
-RESUME_FOLDER = "faster_rcnn_orpn_r50_fpn_1x_dota10_20250811_111928"  # Folder name under work_dirs
+RESUME_FOLDER = "faster_rcnn_orpn_r101_fpn_1x_dota10_20250822_183631"  # Folder name under work_dirs
 
 # ===== Stability & Safety =====
 if USE_DUAL_GPU:
@@ -32,8 +32,9 @@ os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["CUDA_DEVICE_MAX_CONNECTIONS"] = "1"
 
 # ===== Config =====
-# CFG = "configs/obb/oriented_rcnn/faster_rcnn_orpn_r50_fpn_1x_dota10.py"
+# CFG = "configs/obb/oriented_rcnn/faster_rcnn_orpn_r101_fpn_1x_dota10.py"
 CFG = "configs/obb/retinanet_obb/retinanet_obb_r101_fpn_2x_dota10.py"
+# CFG = "configs/obb/faster_rcnn_obb/faster_rcnn_obb_r101_fpn_1x_dota10.py"
 
 # ===== Workdir =====
 WORKDIR_ROOT = "/home/DATA/RAMDISK/OBBDetection/work_dirs"
