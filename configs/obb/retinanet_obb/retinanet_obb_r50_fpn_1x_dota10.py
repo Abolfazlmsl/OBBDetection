@@ -68,6 +68,6 @@ train_cfg = dict(
 test_cfg = dict(
     nms_pre=2000,
     min_bbox_size=0,
-    score_thr=0.9,
-    nms=dict(type='obb_nms', iou_thr=0.5),
+    score_thr=0.25,
+    nms=dict(type='obb_nms', iou_thr=0.2),
     max_per_img=2000)

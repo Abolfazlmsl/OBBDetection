@@ -13,23 +13,26 @@ import pandas as pd
 from shapely.geometry import Polygon, Point
 from mmdet.apis import init_detector, inference_detector
 from concurrent.futures import ThreadPoolExecutor
+import time
+
+start_time = time.time()
 
 # ===== User Settings =====
 CALCULATE_METRICS = True
 
 TILE_MODELS = [
-    {"config": "configs/obb/oriented_rcnn/faster_rcnn_orpn_r101_fpn_1x_dota10.py",
-      "checkpoint": "Checkpoints/best128.pth", "tile_size": 128, "overlap": 50}
-    # {"config": "configs/obb/retinanet_obb/retinanet_obb_r101_fpn_2x_dota10.py",
-    #   "checkpoint": "Checkpoints/best128-ret.pth", "tile_size": 128, "overlap": 50}
-    # {"config": "configs/obb/faster_rcnn_obb/faster_rcnn_obb_r101_fpn_1x_dota10.py",
-    #   "checkpoint": "Checkpoints/best128-cnn.pth", "tile_size": 128, "overlap": 50}
     # {"config": "configs/obb/oriented_rcnn/faster_rcnn_orpn_r101_fpn_1x_dota10.py",
-    #  "checkpoint": "Checkpoints/best416.pth", "tile_size": 416, "overlap": 150}
+    #   "checkpoint": "Checkpoints/best128.pth", "tile_size": 128, "overlap": 20},
     # {"config": "configs/obb/retinanet_obb/retinanet_obb_r101_fpn_2x_dota10.py",
-    #  "checkpoint": "Checkpoints/best416-ret.pth", "tile_size": 416, "overlap": 150}
+    #   "checkpoint": "Checkpoints/best128-ret.pth", "tile_size": 128, "overlap": 20}
     # {"config": "configs/obb/faster_rcnn_obb/faster_rcnn_obb_r101_fpn_1x_dota10.py",
-    #  "checkpoint": "Checkpoints/best416-cnn.pth", "tile_size": 416, "overlap": 150}
+    #   "checkpoint": "Checkpoints/best128-cnn.pth", "tile_size": 128, "overlap": 50},
+    # {"config": "configs/obb/oriented_rcnn/faster_rcnn_orpn_r101_fpn_1x_dota10.py",
+    #   "checkpoint": "Checkpoints/best416.pth", "tile_size": 416, "overlap": 50},
+    # {"config": "configs/obb/retinanet_obb/retinanet_obb_r101_fpn_2x_dota10.py",
+    #   "checkpoint": "Checkpoints/best416-ret.pth", "tile_size": 416, "overlap": 50},
+    {"config": "configs/obb/faster_rcnn_obb/faster_rcnn_obb_r101_fpn_1x_dota10.py",
+      "checkpoint": "Checkpoints/best416-cnn.pth", "tile_size": 416, "overlap": 150}
 ]
 
 
@@ -101,7 +104,7 @@ INPUT_DIR = "Input"
 OUTPUT_DIR = "Output"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-USE_DUAL_GPU = False  # True for dual GPU, False for single GPU
+USE_DUAL_GPU = True  # True for dual GPU, False for single GPU
 
 # ===== Helper Functions =====
 def _poly_to_aabb_xyxy(box8):
@@ -184,6 +187,7 @@ def merge_detections(detections, iou_threshold=0.5, excluse_check=True):
     return merged
 
 def process_image(image_path, models, gpu_id):
+    t0 = time.time()
     image = cv2.imread(image_path)
     all_detections = []
     for model_info, model in zip(TILE_MODELS, models):
@@ -191,6 +195,7 @@ def process_image(image_path, models, gpu_id):
         all_detections.extend(dets)
 
     merged = merge_detections(all_detections, IOU_THRESHOLD, False)
+    print(f"--- {time.time() - t0:.3f} seconds ---")
     result_img = image.copy()
     rows = []
     for x1,y1,x2,y2,x3,y3,x4,y4,cls,conf in merged:
@@ -637,6 +642,8 @@ if __name__ == "__main__":
             models_gpu0 = [init_detector(m["config"], m["checkpoint"], device='cpu') for m in TILE_MODELS]
             for img in image_files:
                 process_image(img, models_gpu0, 0)
+
+    print("--- %s seconds ---" % (time.time() - start_time))
             
     if CALCULATE_METRICS:
         try:
